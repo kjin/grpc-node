@@ -16,9 +16,11 @@
   "devDependencies": {
     "@types/lodash": "^4.14.77",
     "@types/mocha": "^2.2.43",
-    "@types/node": "^8.0.34",
+    "@types/node": "^8.0.55",
     "clang-format": "^1.0.55",
-    "google-ts-style": "^0.2.0"
+    "gts": "^0.5.1",
+    "ts-node": "^3.3.0",
+    "typescript": "^2.6.1"
   },
   "contributors": [
     {
@@ -28,12 +30,16 @@
   "_id": "@grpc/js-core@0.1.0",
   "scripts": {
     "build": "npm run compile",
-    "clean": "gulp clean",
-    "compile": "gulp compile",
+    "clean": "gts clean",
+    "compile": "tsc -p .",
     "format": "clang-format -i -style=\"{Language: JavaScript, BasedOnStyle: Google, ColumnLimit: 80}\" src/*.ts test/*.ts",
     "lint": "tslint -c node_modules/google-ts-style/tslint.json -p . -t codeFrame --type-check",
-    "prepare": "npm run build",
-    "test": "gulp test"
+    "prepare": "npm run compile",
+    "test": "gulp test",
+    "check": "gts check",
+    "fix": "gts fix",
+    "pretest": "npm run compile",
+    "posttest": "npm run check"
   },
   "dependencies": {
     "lodash": "^4.17.4"

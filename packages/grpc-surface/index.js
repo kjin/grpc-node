@@ -143,5 +143,9 @@ module.exports = function(grpc) {
     return ServiceClient;
   };
 
+  exports.makeGenericClientConstructor = exports.makeClientConstructor;
+
+  // exports.getClientChannel = 
+
   return Object.assign(exports, grpc);
 };

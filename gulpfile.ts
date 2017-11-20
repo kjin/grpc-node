@@ -18,16 +18,22 @@
 import * as _gulp from 'gulp';
 import * as help from 'gulp-help';
 
-const shimmer = require('shimmer');
-
 // gulp-help monkeypatches tasks to have an additional description parameter
 const gulp = help(_gulp);
 
 const runSequence = require('run-sequence');
 
+/**
+ * Require a module at the given path with a patched gulp object that prepends
+ * the given prefix to each task name.
+ * @param path The path to require.
+ * @param prefix The string to use as a prefix. This will be prepended to a task
+ *               name with a '.' separator.
+ */
 function loadGulpTasksWithPrefix(path: string, prefix: string) {
   const gulpTask = gulp.task;
   gulp.task = ((taskName: string, ...args: any[]) => {
+    // Don't create a task for ${prefix}.help
     if (taskName === 'help') {
       return;
     }
@@ -54,7 +60,7 @@ function loadGulpTasksWithPrefix(path: string, prefix: string) {
 const root = __dirname;
 
 gulp.task('install', 'Install dependencies for all subdirectory packages',
-          ['js.core.install', 'native.core.install', 'surface.install', 'health-check.install', 'internal.test.install']);
+          ['js.install', 'js.core.install', 'native.core.install', 'surface.install', 'health-check.install', 'internal.test.install']);
 
 gulp.task('install.windows', 'Install dependencies for all subdirectory packages for MS Windows',
           ['js.core.install', 'native.core.install.windows', 'surface.install', 'health-check.install', 'internal.test.install']);

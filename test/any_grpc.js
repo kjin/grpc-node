@@ -12,8 +12,9 @@ function getImplementation(globalField) {
     ].join(' '));
   }
   const impl = global[globalField];
+  const surface = require(`../packages/grpc-${impl}`);
   return {
-    surface: require(`../packages/grpc-${impl}`),
+    surface: Object.assign(surface, require('../packages/grpc-protobufjs')(surface)),
     pjson: require(`../packages/grpc-${impl}/package.json`),
     core: require(`../packages/grpc-${impl}-core`),
     corePjson: require(`../packages/grpc-${impl}-core/package.json`)
@@ -33,7 +34,4 @@ module.exports = Object.assign({
     client: clientImpl,
     server: serverImpl
   }
-}, clientImpl.surface, _.pick(serverImpl.surface, [
-  'Server',
-  'ServerCredentials'
-]));
+}, serverImpl.surface, clientImpl.surface);
