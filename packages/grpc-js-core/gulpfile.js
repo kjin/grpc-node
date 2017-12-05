@@ -97,14 +97,14 @@ function makeCompileFn(globs) {
   };
 }
 
-gulp.task('js.core.install', 'Install native core dependencies', () => {
+gulp.task('install', 'Install native core dependencies', () => {
   return execa('npm', ['install', '--unsafe-perm'], {cwd: jsCoreDir, stdio: 'inherit'});
 });
 
 /**
  * Runs tslint on files in src/, with linting rules defined in tslint.json.
  */
-gulp.task('js.core.lint', 'Emits linting errors found in src/ and test/.', () => {
+gulp.task('lint', 'Emits linting errors found in src/ and test/.', () => {
   const program = require('tslint').Linter.createProgram(tsconfigPath);
   gulp.src([`${srcDir}/**/*.ts`, `${testDir}/**/*.ts`])
       .pipe(tslint({
@@ -116,12 +116,11 @@ gulp.task('js.core.lint', 'Emits linting errors found in src/ and test/.', () =>
       .on('warning', onError);
 });
 
-gulp.task('js.core.clean', 'Deletes transpiled code.', () => {
+gulp.task('clean', 'Deletes transpiled code.', () => {
   return del(outDir);
 });
 
-gulp.task('js.core.clean.all', 'Deletes all files added by targets',
-	  ['js.core.clean']);
+gulp.task('clean.all', 'Deletes all files added by targets', ['clean']);
 
 /**
  * Transpiles TypeScript files in src/ to JavaScript according to the settings
@@ -129,20 +128,20 @@ gulp.task('js.core.clean.all', 'Deletes all files added by targets',
  * Currently, all errors are emitted twice. This is being tracked here:
  * https://github.com/ivogabe/gulp-typescript/issues/438
  */
-gulp.task('js.core.compile', 'Transpiles src/.',
+gulp.task('compile', 'Transpiles src/.',
           makeCompileFn({ transpile: [`${srcDir}/**/*.ts`] }));
 
 /**
  * Transpiles TypeScript files in both src/ and test/.
  */
-gulp.task('js.core.test.compile', 'After dep tasks, transpiles test/.', ['js.core.compile'],
+gulp.task('test.compile', 'After dep tasks, transpiles test/.', ['compile'],
           makeCompileFn({ transpile: [`${testDir}/**/*.ts`], copy: `${testDir}/**/!(*.ts)` }));
 
 /**
  * Transpiles src/ and test/, and then runs all tests.
  */
-gulp.task('js.core.test', 'After dep tasks, runs all tests.',
-          ['js.core.test.compile'], () => {
+gulp.task('test', 'After dep tasks, runs all tests.',
+          ['test.compile'], () => {
             return gulp.src(`${outDir}/test/**/*.js`)
                 .pipe(mocha({reporter: 'mocha-jenkins-reporter'}));
           }
@@ -151,7 +150,7 @@ gulp.task('js.core.test', 'After dep tasks, runs all tests.',
 /**
  * Transpiles individual files, specified by the --file flag.
  */
-gulp.task('js.core.compile.single', 'Transpiles individual files specified by --file.',
+gulp.task('compile.single', 'Transpiles individual files specified by --file.',
           makeCompileFn({
             transpile: files.map(f => path.relative('.', f))
           })
@@ -164,8 +163,8 @@ gulp.task('js.core.compile.single', 'Transpiles individual files specified by --
  * ["test.single", "--file", "${file}"] makes it possible for one to debug the
  * currently open TS mocha test file in one step.
  */
-gulp.task('js.core.test.single', 'After dep tasks, runs individual files specified ' +
-          'by --file.', ['js.core.compile', 'js.core.compile.single'], () => {
+gulp.task('test.single', 'After dep tasks, runs individual files specified ' +
+          'by --file.', ['compile', 'compile.single'], () => {
             // util.env contains CLI arguments for the gulp task.
             // Determine the path to the transpiled version of this TS file.
             const getTranspiledPath = (file) => {

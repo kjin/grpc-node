@@ -29,7 +29,7 @@
   "scripts": {
     "build": "npm run compile",
     "clean": "gulp clean",
-    "compile": "gulp js.core.compile",
+    "compile": "gulp compile",
     "format": "clang-format -i -style=\"{Language: JavaScript, BasedOnStyle: Google, ColumnLimit: 80}\" src/*.ts test/*.ts",
     "lint": "tslint -c node_modules/google-ts-style/tslint.json -p . -t codeFrame --type-check",
     "prepare": "npm run build",
