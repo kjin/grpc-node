@@ -182,6 +182,11 @@ export class Metadata {
     return result;
   }
 
+  // For compatibility with the other Metadata implementation
+  private _getCoreRepresentation() {
+    return this.internalRepr;
+  }
+
   /**
    * Returns a new Metadata object based fields in a given IncomingHttpHeaders
    * object.
