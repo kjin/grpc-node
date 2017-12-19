@@ -59,6 +59,7 @@ export class Client {
       call: CallStream, deserialize: (value: Buffer) => ResponseType,
       callback: UnaryCallback<ResponseType>): void {
     let responseMessage: ResponseType|null = null;
+    let statusEmitted = false;
     call.on('data', (data: Buffer) => {
       if (responseMessage != null) {
         call.cancelWithStatus(Status.INTERNAL, 'Too many responses received');
@@ -73,6 +74,8 @@ export class Client {
     call.on('end', () => {
       if (responseMessage == null) {
         call.cancelWithStatus(Status.INTERNAL, 'Not enough responses received');
+      } else if (statusEmitted) {
+        callback(null, responseMessage as ResponseType);
       }
     });
     call.on('status', (status: StatusObject) => {
@@ -81,7 +84,11 @@ export class Client {
        * Therefore, considering the above event handlers, status.code should be
        * OK if and only if we have a non-null responseMessage */
       if (status.code === Status.OK) {
-        callback(null, responseMessage as ResponseType);
+        if (responseMessage !== null) {
+          callback(null, responseMessage as ResponseType);
+        } else {
+          statusEmitted = true;
+        }
       } else {
         const error = new ServiceErrorImpl(status.details);
         error.code = status.code;
