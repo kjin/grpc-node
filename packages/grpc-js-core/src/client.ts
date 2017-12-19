@@ -55,6 +55,10 @@ export class Client {
     }
   }
 
+  getChannel() {
+    return this.channel;
+  }
+
   private handleUnaryResponse<ResponseType>(
       call: CallStream, deserialize: (value: Buffer) => ResponseType,
       callback: UnaryCallback<ResponseType>): void {
@@ -160,7 +164,7 @@ export class Client {
     call.end();
     this.handleUnaryResponse<ResponseType>(call, deserialize, callback);
 
-    const emitter: ClientUnaryCall = new ClientUnaryCallImpl(call);
+    const emitter: ClientUnaryCall = new ClientUnaryCallImpl(this.channel, call);
     return emitter;
   }
 
@@ -196,7 +200,7 @@ export class Client {
     this.handleUnaryResponse<ResponseType>(call, deserialize, callback);
 
     const stream: ClientWritableStream<RequestType> =
-        new ClientWritableStreamImpl<RequestType>(call, serialize);
+        new ClientWritableStreamImpl<RequestType>(this.channel, call, serialize);
     return stream;
   }
 
@@ -247,7 +251,7 @@ export class Client {
     call.end();
 
     const stream: ClientReadableStream<ResponseType> =
-        new ClientReadableStreamImpl<ResponseType>(call, deserialize);
+        new ClientReadableStreamImpl<ResponseType>(this.channel, call, deserialize);
     return stream;
   }
 
@@ -270,7 +274,7 @@ export class Client {
 
     const stream: ClientDuplexStream<RequestType, ResponseType> =
         new ClientDuplexStreamImpl<RequestType, ResponseType>(
-            call, serialize, deserialize);
+            this.channel, call, serialize, deserialize);
     return stream;
   }
 }
