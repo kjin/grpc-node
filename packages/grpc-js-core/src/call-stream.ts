@@ -35,7 +35,6 @@ export interface WriteObject {
  */
 export type CallStream =  {
   cancelWithStatus(status: Status, details: string): void;
-  getPeer(): string;
 
   getDeadline(): Deadline;
   getCredentials(): CallCredentials;
@@ -350,10 +349,6 @@ export class Http2CallStream extends Duplex implements CallStream {
 
   getStatus(): StatusObject|null {
     return this.finalStatus;
-  }
-
-  getPeer(): string {
-    throw new Error('Not yet implemented');
   }
 
   _read(size: number) {
