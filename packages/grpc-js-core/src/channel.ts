@@ -17,6 +17,8 @@ import {Metadata, MetadataObject} from './metadata';
 import { MetadataStatusFilterFactory } from './metadata-status-filter';
 import { PropagateFlags } from './index';
 
+const { version: clientVersion } = require('../../package');
+
 export type CallOptions = {
   // Represents a parent server call.
   // For our purposes we only need to know of the 'cancelled' event.
@@ -38,7 +40,8 @@ const {
   HTTP2_HEADER_METHOD,
   HTTP2_HEADER_PATH,
   HTTP2_HEADER_SCHEME,
-  HTTP2_HEADER_TE
+  HTTP2_HEADER_TE,
+  HTTP2_HEADER_USER_AGENT
 } = http2.constants;
 
 /**
@@ -212,6 +215,7 @@ export class Http2Channel extends EventEmitter implements Channel {
       .then(([metadataValue]) => {
         let headers = metadataValue.toHttp2Headers();
         headers[HTTP2_HEADER_AUTHORITY] = this.authority.hostname;
+        headers[HTTP2_HEADER_USER_AGENT] = `grpc-node/${clientVersion}`;
         headers[HTTP2_HEADER_CONTENT_TYPE] = 'application/grpc';
         headers[HTTP2_HEADER_METHOD] = 'POST';
         headers[HTTP2_HEADER_PATH] = methodName;
@@ -254,7 +258,8 @@ export class Http2Channel extends EventEmitter implements Channel {
     this.startHttp2Stream(methodName, stream, metadata);
 
     // handle propagation flags
-    const propagateFlags = options.propagate_flags || 0;
+    const propagateFlags = typeof options.propagate_flags === 'number' ?
+        options.propagate_flags : PropagateFlags.DEFAULTS;
     if (options.parent) {
       // TODO(kjin): Implement other propagation flags.
       if (propagateFlags & PropagateFlags.CANCELLATION) {
