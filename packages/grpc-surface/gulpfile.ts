@@ -20,6 +20,7 @@ import * as help from 'gulp-help';
 import * as execa from 'execa';
 import * as path from 'path';
 import * as del from 'del';
+const linkSync = require('../../util').linkSync;
 
 // gulp-help monkeypatches tasks to have an additional description parameter
 const gulp = help(_gulp);
@@ -44,3 +45,7 @@ gulp.task('clean.all', 'Delete all files created by tasks', ['clean.links']);
 gulp.task('compile', 'Transpiles src/.', () => execNpmCommand('compile'));
 
 gulp.task('install', 'Install dependencies', () => execNpmVerb('install'));
+
+gulp.task('link.add', 'Link local copies of dependencies', () => {
+  linkSync(surfaceDir, './node_modules/@grpc/core-types', '../grpc-core-types');
+});
