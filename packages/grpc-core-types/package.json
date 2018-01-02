@@ -1,0 +1,21 @@
+{
+  "name": "@grpc/core-types",
+  "version": "0.1.0",
+  "_id": "@grpc/core-types@0.1.0",
+  "description": "Types for gRPC core implementations",
+  "homepage": "https://grpc.io/",
+  "types": "index.d.ts",
+  "keywords": [],
+  "author": {
+    "name": "Google Inc."
+  },
+  "license": "Apache-2.0",
+  "contributors": [
+    {
+      "name": "Google Inc."
+    }
+  ],
+  "dependencies": {
+    "@types/node": "^8.5.2"
+  }
+}

@@ -16,23 +16,47 @@
  *
  */
 
-'use strict';
+// TODO(kjin): Improve on Function types
 
-const util = require('util');
+import * as util from 'util';
+import * as _ from 'lodash';
+import { GrpcCore } from '@grpc/core-types';
+import { Client, UnaryCallback, CallOptions } from '@grpc/core-types/client';
+import { Metadata } from '@grpc/core-types/metadata';
 
-const _ = require('lodash');
+interface ClientClassOptions {
+  deprecatedArgumentOrder?: boolean;
+}
 
-module.exports = function(grpc) {
+interface ClientMethodAttributes {
+  requestStream: boolean;
+  responseStream: boolean;
+  requestSerialize: Function;
+  responseDeserialize: Function;
+  originalName: string;
+  path: string;
+}
 
-  let exports = {};
+interface ClientMethods {
+  [key: string]: ClientMethodAttributes;
+}
 
-  const Client = grpc.Client;
+namespace makeSurface {
+  export type GrpcSurface = {
+    makeClientConstructor: Function;
+    makeGenericClientConstructor: Function;
+  } & GrpcCore;
+}
 
-  function getDefaultValues(metadata, options) {
-    var res = {};
-    res.metadata = metadata || new grpc.Metadata();
-    res.options = options || {};
-    return res;
+function makeSurface(grpc: GrpcCore): makeSurface.GrpcSurface {    
+  function getDefaultValues<T>(metadata?: Metadata, options?: T): {
+    metadata: Metadata;
+    options: Partial<T>;
+  } {
+    return {
+      metadata: metadata || new grpc.Metadata(),
+      options: options || {}
+    };
   }
 
   /**
@@ -40,27 +64,28 @@ module.exports = function(grpc) {
    * argument order with optional arguments after the callback.
    * @access private
    */
-  var deprecated_request_wrap = {
-    unary: function(makeUnaryRequest) {
-      return function makeWrappedUnaryRequest(argument, callback,
-                                              metadata, options) {
-        /* jshint validthis: true */
-        var opt_args = getDefaultValues(metadata, metadata);
+  const deprecated_request_wrap = {
+    unary: (makeUnaryRequest: Function) => {
+      return function makeWrappedUnaryRequest<RequestType, ResponseType>(
+          this: Client, argument: RequestType,
+          callback: UnaryCallback<ResponseType>, metadata?: Metadata,
+          options?: CallOptions) {
+        const opt_args = getDefaultValues(metadata, options);
         return makeUnaryRequest.call(this, argument, opt_args.metadata,
-                                     opt_args.options, callback);
+                                      opt_args.options, callback);
       };
     },
-    client_stream: function(makeServerStreamRequest) {
-      return function makeWrappedClientStreamRequest(callback, metadata,
-                                                     options) {
-        /* jshint validthis: true */
-        var opt_args = getDefaultValues(metadata, options);
+    client_stream: (makeServerStreamRequest: Function) => {
+      return function makeWrappedClientStreamRequest<RequestType, ResponseType>(
+          this: Client, callback: UnaryCallback<ResponseType>,
+          metadata?: Metadata, options?: CallOptions) {
+        const opt_args = getDefaultValues(metadata, options);
         return makeServerStreamRequest.call(this, opt_args.metadata,
                                             opt_args.options, callback);
       };
     },
-    server_stream: _.identity,
-    bidi: _.identity
+    server_stream: (f: Function) => f,
+    bidi: (f: Function) => f
   };
 
   /**
@@ -69,10 +94,10 @@ module.exports = function(grpc) {
    * @private
    */
   const requester_funcs = {
-    unary: Client.prototype.makeUnaryRequest,
-    server_stream: Client.prototype.makeServerStreamRequest,
-    client_stream: Client.prototype.makeClientStreamRequest,
-    bidi: Client.prototype.makeBidiStreamRequest
+    unary: grpc.Client.prototype.makeUnaryRequest,
+    server_stream: grpc.Client.prototype.makeServerStreamRequest,
+    client_stream: grpc.Client.prototype.makeClientStreamRequest,
+    bidi: grpc.Client.prototype.makeBidiStreamRequest
   };
 
   /**
@@ -91,20 +116,19 @@ module.exports = function(grpc) {
    * @return {function} New client constructor, which is a subclass of
    *     {@link grpc.Client}, and has the same arguments as that constructor.
    */
-  exports.makeClientConstructor = function(methods, serviceName,
-                                           class_options) {
+  const makeClientConstructor = (methods: ClientMethods, serviceName: string,
+      class_options: ClientClassOptions) => {
     if (!class_options) {
       class_options = {};
     }
 
-    function ServiceClient(address, credentials, options) {
-      Client.call(this, address, credentials, options);
+    class ServiceClient extends grpc.Client {
+      static service: {};
+      [methodName: string]: Function;
     }
 
-    util.inherits(ServiceClient, Client);
-
-    _.each(methods, function(attrs, name) {
-      var method_type;
+    _.each(methods, (attrs, name) => {
+      let method_type: keyof typeof requester_funcs;
       // TODO(murgatroid99): Verify that we don't need this anymore
       if (_.startsWith(name, '$')) {
         throw new Error('Method names cannot start with $');
@@ -122,12 +146,12 @@ module.exports = function(grpc) {
           method_type = 'unary';
         }
       }
-      var serialize = attrs.requestSerialize;
-      var deserialize = attrs.responseDeserialize;
-      var method_func = _.partial(requester_funcs[method_type], attrs.path,
+      const serialize = attrs.requestSerialize;
+      const deserialize = attrs.responseDeserialize;
+      const method_func = _.partial(requester_funcs[method_type], attrs.path,
                                   serialize, deserialize);
       if (class_options.deprecatedArgumentOrder) {
-        ServiceClient.prototype[name] = deprecated_request_wrap(method_func);
+        ServiceClient.prototype[name] = deprecated_request_wrap[method_type](method_func);
       } else {
         ServiceClient.prototype[name] = method_func;
       }
@@ -143,7 +167,12 @@ module.exports = function(grpc) {
     return ServiceClient;
   };
 
-  exports.makeGenericClientConstructor = exports.makeClientConstructor;
+  const makeGenericClientConstructor = makeClientConstructor;
 
-  return Object.assign(exports, grpc);
+  return Object.assign({
+    makeClientConstructor,
+    makeGenericClientConstructor
+  }, grpc);
 };
+
+export = makeSurface;

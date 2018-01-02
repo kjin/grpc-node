@@ -80,7 +80,7 @@ gulp.task('link', 'Link together packages', (callback) => {
   /**
    * We use workarounds for linking in some modules. See npm/npm#18835
    */
-  runSequence('link.core', 'link.surface',
+  runSequence('surface.link.add', 'link.core', 'link.surface',
               callback);
 });
 
