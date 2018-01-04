@@ -1,4 +1,5 @@
 import { CallCredentials } from './call-credentials';
+import { Channel } from './channel';
 import { Status } from './constants';
 import { Metadata } from './metadata';
 import { EmitterAugmentation0, EmitterAugmentation1 } from './events';
@@ -113,7 +114,7 @@ export type ClientDuplexStream<RequestType, ResponseType> =
 export interface Client {
   close(): void;
   waitForReady(deadline: Date|number, callback: (error: Error|null) => void): void;
-  getChannel(): {}; // TODO(kjin): but what should this actually return
+  getChannel(): Channel;
 
   makeUnaryRequest<RequestType, ResponseType>(
     method: string, serialize: (value: RequestType) => Buffer,
