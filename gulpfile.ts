@@ -69,6 +69,7 @@ gulp.task('lint', 'Emit linting errors in source and test files',
           ['js.core.lint', 'native.core.lint']);
 
 gulp.task('build', 'Build packages', ['surface.compile', 'js.compile', 'js.core.compile', 'native.core.build']);
+gulp.task('compile', 'Synonym for build', ['build']);
 
 gulp.task('link.core', 'Add links to core packages without rebuilding',
           ['js.link.add', 'native.link.add']);
