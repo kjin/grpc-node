@@ -15,7 +15,7 @@ import {DeadlineFilterFactory} from './deadline-filter';
 import {FilterStackFactory} from './filter-stack';
 import {Metadata, MetadataObject} from './metadata';
 import { MetadataStatusFilterFactory } from './metadata-status-filter';
-import { PropagateFlags } from './index';
+import { PropagateFlags } from './constants';
 
 const { version: clientVersion } = require('../../package');
 

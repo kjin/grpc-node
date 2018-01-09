@@ -18,62 +18,7 @@
 
 'use strict';
 
-import {
-  CallCredentials,
-  ChannelCredentials,
-  Metadata,
-  Status,
-  PropagateFlags,
-  Client
-} from '@grpc/js-core';
+import * as makeSurface from '@grpc/surface';
+import * as core from '@grpc/js-core';
 
-const compose = <S extends { compose: (other: T) => S }, T>(a: S, b: T) => a.compose(b);
-
-const notImplementedFn = () => { throw new Error('Not implemented'); }
-
-// TODO(kjin): All of this actually belongs in @grpc/surface.
-module.exports = require('@grpc/surface')({
-  Client,
-  Metadata,
-  propagate: PropagateFlags,
-  status: Status,
-  credentials: {
-    createSsl: ChannelCredentials.createSsl,
-    createFromMetadataGenerator: CallCredentials.createFromMetadataGenerator,
-    createFromGoogleCredential: (googleCredential: any) => {
-      return CallCredentials.createFromMetadataGenerator((authContext, callback) => {
-        const serviceUrl = (authContext as any).service_url;
-        googleCredential.getRequestMetadata(serviceUrl, (err: Error, header: any) => {
-          if (err) {
-            callback(err);
-            return;
-          }
-          const metadata = new Metadata();
-          metadata.add('authorization', header.Authorization);
-          callback(null, metadata);
-        });
-      });
-    },
-    combineChannelCredentials: (channelCredentials: ChannelCredentials,
-        ...callCredentialsList: CallCredentials[]): ChannelCredentials => {
-      return callCredentialsList.reduce(compose, channelCredentials);
-    },
-    combineCallCredentials: (...callCredentialsList: CallCredentials[]): CallCredentials => {
-      return callCredentialsList.slice(1).reduce(compose, callCredentialsList[0]);
-    },
-    createInsecure: ChannelCredentials.createInsecure
-  },
-  get setLogger() { return notImplementedFn; },
-  get setLogVerbosity() { return notImplementedFn; },
-  get ServerCredentials() { return notImplementedFn; },
-  get callError() { return notImplementedFn; },
-  get writeFlags() { return notImplementedFn; },
-  get logVerbosity() { return notImplementedFn; },
-  getClientChannel(client: Client) {
-    return client.getChannel();
-  },
-  waitForClientReady(client: Client, deadline: number|Date, callback: (err: Error|null) => {}) {
-    client.waitForReady(deadline, callback);
-  },
-  closeClient(client: Client) { return client.close(); }
-});
+module.exports = makeSurface(core);
