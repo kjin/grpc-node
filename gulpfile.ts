@@ -68,7 +68,10 @@ gulp.task('install.all.windows', 'Install dependencies for all subdirectory pack
 gulp.task('lint', 'Emit linting errors in source and test files',
           ['js.core.lint', 'native.core.lint']);
 
-gulp.task('build', 'Build packages', ['surface.compile', 'js.compile', 'js.core.compile', 'native.core.build']);
+gulp.task('build', 'Build packages', ['native.core.build'], () => {
+  runSequence('js.core.compile', 'surface.compile', 'js.compile');
+});
+
 gulp.task('compile', 'Synonym for build', ['build']);
 
 gulp.task('link.core', 'Add links to core packages without rebuilding',

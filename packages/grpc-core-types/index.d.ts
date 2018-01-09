@@ -1,38 +1,61 @@
 import { CallCredentials } from './call-credentials';
+import { Channel } from './channel';
 import { ChannelCredentials } from './channel-credentials';
 import { Client } from './client';
 import { Metadata } from './metadata';
+import { Server } from './server';
+import { ServerCredentials } from './server-credentials';
+
+export {
+  CallCredentials,
+  Channel,
+  ChannelCredentials,
+  Client,
+  Metadata,
+  Server,
+  ServerCredentials
+};
+
+export type Constructor<T> = {
+  new(...args: any[]): T;
+  prototype: T;
+};
+
+export interface Enum {
+  [key: string]: number;
+}
 
 export type CallMetadataGenerator = (options: {},
     cb: (err: Error|null, metadata?: Metadata) => void) => void;
 
+export interface Logger {
+  error: typeof console.error;
+}
+
 export interface GrpcCore {
   CallCredentials: {
-    new(): CallCredentials;
-    prototype: CallCredentials;
     createFromMetadataGenerator(metadataGenerator: CallMetadataGenerator)
         : CallCredentials;
     createEmpty(): CallCredentials;
   };
   ChannelCredentials: {
-    new(): ChannelCredentials;
-    prototype: ChannelCredentials;
     createSsl(rootCerts?: Buffer|null, privateKey?: Buffer|null,
         certChain?: Buffer|null): ChannelCredentials;
     createInsecure(): ChannelCredentials;
   };
-  Client: {
-    new(): Client;
-    prototype: Client;
+  Client: Constructor<Client>;
+  Metadata: Constructor<Metadata>;
+  Server: Constructor<Server>;
+  ServerCredentials: Constructor<ServerCredentials>;
+  Constants: {
+    Status: Enum;
+    PropagateFlags: Enum;
+    CallError: Enum;
+    WriteFlags: Enum;
+    LogVerbosity: Enum;
   };
-  Metadata: {
-    new(): Metadata;
-    prototype: Metadata;
-  };
-  Status: {
-    [key: string]: number;
-  };
-  PropagateFlags: {
-    [key: string]: number;
+  Logging: {
+    setLogger(logger: Logger): void;
+    setLogVerbosity(verbosity: number): void; // TODO
   }
 }

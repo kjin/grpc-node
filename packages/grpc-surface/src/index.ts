@@ -20,9 +20,22 @@
 
 import * as util from 'util';
 import * as _ from 'lodash';
-import { GrpcCore } from '@grpc/core-types';
-import { Client, UnaryCallback, CallOptions } from '@grpc/core-types/client';
-import { Metadata } from '@grpc/core-types/metadata';
+import {
+  GrpcCore,
+  CallCredentials,
+  ChannelCredentials,
+  Channel,
+  Client,
+  Metadata,
+  Server,
+  ServerCredentials,
+  Constructor,
+  Enum,
+  Logger
+} from '@grpc/core-types';
+import { UnaryCallback, CallOptions } from '@grpc/core-types/client';
+
+const compose = <S extends { compose: (other: T) => S }, T>(a: S, b: T) => a.compose(b);
 
 interface ClientClassOptions {
   deprecatedArgumentOrder?: boolean;
@@ -43,12 +56,27 @@ interface ClientMethods {
 
 namespace makeSurface {
   export type GrpcSurface = {
+    Client: Constructor<Client>;
+    Metadata: Constructor<Metadata>;
+    Server: Constructor<Server>;
+    ServerCredentials: Constructor<ServerCredentials>;
     makeClientConstructor: Function;
     makeGenericClientConstructor: Function;
-  } & GrpcCore;
+    credentials: {};
+    getClientChannel(client: Client): Channel;
+    waitForClientReady(client: Client, deadline: number|Date, callback: (err: Error|null) => {}): void;
+    closeClient(client: Client): void;
+    setLogger(logger: Logger): void;
+    setLogVerbosity(verbosity: number): void;
+    callError: Enum;
+    logVerbosity: Enum;
+    propagate: Enum;
+    status: Enum;
+    writeFlags: Enum;
+  };
 }
 
-function makeSurface(grpc: GrpcCore): makeSurface.GrpcSurface {    
+function makeSurface(grpc: GrpcCore): makeSurface.GrpcSurface {
   function getDefaultValues<T>(metadata?: Metadata, options?: T): {
     metadata: Metadata;
     options: Partial<T>;
@@ -167,12 +195,52 @@ function makeSurface(grpc: GrpcCore): makeSurface.GrpcSurface {
     return ServiceClient;
   };
 
-  const makeGenericClientConstructor = makeClientConstructor;
-
-  return Object.assign({
+  return {
+    Client: grpc.Client,
+    Metadata: grpc.Metadata,
+    Server: grpc.Server,
+    ServerCredentials: grpc.ServerCredentials,
     makeClientConstructor,
-    makeGenericClientConstructor
-  }, grpc);
+    makeGenericClientConstructor: makeClientConstructor,
+    credentials: {
+      createSsl: grpc.ChannelCredentials.createSsl,
+      createFromMetadataGenerator: grpc.CallCredentials.createFromMetadataGenerator,
+      createFromGoogleCredential: (googleCredential: any) => {
+        return grpc.CallCredentials.createFromMetadataGenerator((authContext, callback) => {
+          const serviceUrl = (authContext as any).service_url;
+          googleCredential.getRequestMetadata(serviceUrl, (err: Error, header: any) => {
+            if (err) {
+              callback(err);
+              return;
+            }
+            const metadata = new grpc.Metadata();
+            metadata.add('authorization', header.Authorization);
+            callback(null, metadata);
+          });
+        });
+      },
+      combineChannelCredentials: (channelCredentials: ChannelCredentials,
+          ...callCredentialsList: CallCredentials[]): ChannelCredentials => {
+        return callCredentialsList.reduce(compose, channelCredentials);
+      },
+      combineCallCredentials: (...callCredentialsList: CallCredentials[]): CallCredentials => {
+        return callCredentialsList.slice(1).reduce(compose, callCredentialsList[0]);
+      },
+      createInsecure: grpc.ChannelCredentials.createInsecure
+    },
+    getClientChannel(client: Client) { return client.getChannel(); },
+    waitForClientReady(client: Client, deadline: number|Date, callback: (err: Error|null) => {}) {
+      client.waitForReady(deadline, callback);
+    },
+    closeClient(client: Client) { return client.close(); },
+    setLogger: grpc.Logging.setLogger,
+    setLogVerbosity: grpc.Logging.setLogVerbosity,
+    callError: grpc.Constants.CallError,
+    logVerbosity: grpc.Constants.LogVerbosity,
+    propagate: grpc.Constants.PropagateFlags,
+    status: grpc.Constants.Status,
+    writeFlags: grpc.Constants.WriteFlags
+  };
 };
 
 export = makeSurface;
