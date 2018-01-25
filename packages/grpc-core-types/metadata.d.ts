@@ -1,3 +1,5 @@
+import * as http2 from 'http2';
+
 export type MetadataValue = string | Buffer;
 
 export interface MetadataObject { [key: string]: Array<MetadataValue>; }
@@ -10,4 +12,5 @@ export interface Metadata {
   getMap(): { [key: string]: MetadataValue };
   clone(): Metadata;
   merge(metadata: Metadata): void;
+  toHttp2Headers(): http2.OutgoingHttpHeaders;
 }

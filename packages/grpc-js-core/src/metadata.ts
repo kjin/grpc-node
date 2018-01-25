@@ -60,11 +60,15 @@ function validate(key: string, value?: MetadataValue): void {
   }
 }
 
+const kInternalRepr = Symbol();
+
 /**
  * A class for storing metadata. Keys are normalized to lowercase ASCII.
  */
 export class Metadata {
-  protected internalRepr: MetadataObject = {};
+  constructor() {
+    (this as any)[kInternalRepr] = {};
+  }
 
   /**
    * Sets the given value for the given key by replacing any other values
@@ -76,7 +80,7 @@ export class Metadata {
   set(key: string, value: MetadataValue): void {
     key = normalizeKey(key);
     validate(key, value);
-    this.internalRepr[key] = [value];
+    this._getCoreRepresentation()[key] = [value];
   }
 
   /**
@@ -89,10 +93,10 @@ export class Metadata {
   add(key: string, value: MetadataValue): void {
     key = normalizeKey(key);
     validate(key, value);
-    if (!this.internalRepr[key]) {
-      this.internalRepr[key] = [value];
+    if (!this._getCoreRepresentation()[key]) {
+      this._getCoreRepresentation()[key] = [value];
     } else {
-      this.internalRepr[key].push(value);
+      this._getCoreRepresentation()[key].push(value);
     }
   }
 
@@ -103,8 +107,8 @@ export class Metadata {
   remove(key: string): void {
     key = normalizeKey(key);
     validate(key);
-    if (Object.prototype.hasOwnProperty.call(this.internalRepr, key)) {
-      delete this.internalRepr[key];
+    if (Object.prototype.hasOwnProperty.call(this._getCoreRepresentation(), key)) {
+      delete this._getCoreRepresentation()[key];
     }
   }
 
@@ -116,8 +120,8 @@ export class Metadata {
   get(key: string): Array<MetadataValue> {
     key = normalizeKey(key);
     validate(key);
-    if (Object.prototype.hasOwnProperty.call(this.internalRepr, key)) {
-      return this.internalRepr[key];
+    if (Object.prototype.hasOwnProperty.call(this._getCoreRepresentation(), key)) {
+      return this._getCoreRepresentation()[key];
     } else {
       return [];
     }
@@ -130,7 +134,7 @@ export class Metadata {
    */
   getMap(): {[key: string]: MetadataValue} {
     const result: {[key: string]: MetadataValue} = {};
-    forOwn(this.internalRepr, (values, key) => {
+    forOwn(this._getCoreRepresentation(), (values, key) => {
       if (values.length > 0) {
         const v = values[0];
         result[key] = v instanceof Buffer ? v.slice() : v;
@@ -145,7 +149,7 @@ export class Metadata {
    */
   clone(): Metadata {
     let newMetadata = new Metadata();
-    newMetadata.internalRepr = cloneMetadataObject(this.internalRepr);
+    (newMetadata as any)[kInternalRepr] = cloneMetadataObject(this._getCoreRepresentation());
     return newMetadata;
   }
 
@@ -157,8 +161,8 @@ export class Metadata {
    * @param other A Metadata object.
    */
   merge(other: Metadata): void {
-    forOwn(other.internalRepr, (values, key) => {
-      this.internalRepr[key] = (this.internalRepr[key] || []).concat(values);
+    forOwn((other as any)[kInternalRepr], (values, key) => {
+      this._getCoreRepresentation()[key] = (this._getCoreRepresentation()[key] || []).concat(values);
     });
   }
 
@@ -168,7 +172,7 @@ export class Metadata {
   toHttp2Headers(): http2.OutgoingHttpHeaders {
     // NOTE: Node <8.9 formats http2 headers incorrectly.
     const result: http2.OutgoingHttpHeaders = {};
-    forOwn(this.internalRepr, (values, key) => {
+    forOwn(this._getCoreRepresentation(), (values, key) => {
       // We assume that the user's interaction with this object is limited to
       // through its public API (i.e. keys and values are already validated).
       result[key] = values.map((value) => {
@@ -183,8 +187,8 @@ export class Metadata {
   }
   
   // For compatibility with the other Metadata implementation
-  private _getCoreRepresentation() {
-    return this.internalRepr;
+  private _getCoreRepresentation(): MetadataObject {
+    return (this as any)[kInternalRepr] as MetadataObject;
   }
 
   /**

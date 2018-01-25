@@ -3,28 +3,15 @@ import * as http2 from 'http2';
 import {range} from 'lodash';
 import {Metadata} from '../src/metadata';
 
-class TestMetadata extends Metadata {
-  getInternalRepresentation() {
-    return this.internalRepr;
-  }
-
-  static fromHttp2Headers(headers: http2.IncomingHttpHeaders): TestMetadata {
-    const result = Metadata.fromHttp2Headers(headers) as TestMetadata;
-    result.getInternalRepresentation =
-        TestMetadata.prototype.getInternalRepresentation;
-    return result;
-  }
-}
-
 const validKeyChars = '0123456789abcdefghijklmnopqrstuvwxyz_-.';
 const validNonBinValueChars =
     range(0x20, 0x7f).map(code => String.fromCharCode(code)).join('');
 
 describe('Metadata', () => {
-  let metadata: TestMetadata;
+  let metadata: Metadata;
 
   beforeEach(() => {
-    metadata = new TestMetadata();
+    metadata = new Metadata();
   });
 
   describe('set', () => {
@@ -210,16 +197,16 @@ describe('Metadata', () => {
       metadata.add('Key2', 'value2a');
       metadata.add('KEY3', 'value3a');
       metadata.add('key4', 'value4');
-      const metadata2 = new TestMetadata();
+      const metadata2 = new Metadata();
       metadata2.add('KEY1', 'value1');
       metadata2.add('key2', 'value2b');
       metadata2.add('key3', 'value3b');
       metadata2.add('key5', 'value5a');
       metadata2.add('key5', 'value5b');
-      const metadata2IR = metadata2.getInternalRepresentation();
+      const metadata2IR = metadata2['_getCoreRepresentation']();
       metadata.merge(metadata2);
       // Ensure metadata2 didn't change
-      assert.deepEqual(metadata2.getInternalRepresentation(), metadata2IR);
+      assert.deepEqual(metadata2['_getCoreRepresentation'](), metadata2IR);
       assert.deepEqual(metadata.get('key1'), ['value1', 'value1']);
       assert.deepEqual(metadata.get('key2'), ['value2a', 'value2b']);
       assert.deepEqual(metadata.get('key3'), ['value3a', 'value3b']);
@@ -265,8 +252,8 @@ describe('Metadata', () => {
           'AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8='
         ]
       };
-      const metadataFromHeaders = TestMetadata.fromHttp2Headers(headers);
-      const internalRepr = metadataFromHeaders.getInternalRepresentation();
+      const metadataFromHeaders = Metadata.fromHttp2Headers(headers);
+      const internalRepr = metadataFromHeaders['_getCoreRepresentation']();
       assert.deepEqual(internalRepr, {
         key1: ['value1'],
         key2: ['value2'],
@@ -279,8 +266,8 @@ describe('Metadata', () => {
     });
 
     it('creates an empty Metadata object from empty headers', () => {
-      const metadataFromHeaders = TestMetadata.fromHttp2Headers({});
-      const internalRepr = metadataFromHeaders.getInternalRepresentation();
+      const metadataFromHeaders = Metadata.fromHttp2Headers({});
+      const internalRepr = metadataFromHeaders['_getCoreRepresentation']();
       assert.deepEqual(internalRepr, {});
     });
   });
