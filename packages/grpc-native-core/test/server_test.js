@@ -62,6 +62,10 @@ describe('server', function() {
     before(function() {
       server = new grpc.Server();
     });
+    after(function() {
+      server.start();
+      server.forceShutdown();
+    });
     it('should bind to an unused port', function() {
       var port;
       assert.doesNotThrow(function() {
@@ -72,8 +76,8 @@ describe('server', function() {
     });
     it('should bind to an unused port with ssl credentials', function() {
       var port;
-      var key_path = path.join(__dirname, '../../../test/data/server1.key');
-      var pem_path = path.join(__dirname, '../../../test/data/server1.pem');
+      var key_path = path.join(__dirname, '/data/server1.key');
+      var pem_path = path.join(__dirname, '/data/server1.pem');
       var key_data = fs.readFileSync(key_path);
       var pem_data = fs.readFileSync(pem_path);
       var creds = grpc.ServerCredentials.createSsl(null,
@@ -83,12 +87,6 @@ describe('server', function() {
         port = server.addHttp2Port('0.0.0.0:0', creds);
       });
       assert(port > 0);
-    });
-  });
-  describe('addSecureHttp2Port', function() {
-    var server;
-    before(function() {
-      server = new grpc.Server();
     });
   });
   describe('start', function() {

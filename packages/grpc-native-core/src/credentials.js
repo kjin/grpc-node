@@ -76,9 +76,35 @@ var _ = require('lodash');
  * @see https://github.com/google/google-auth-library-nodejs
  */
 
+const PEM_CERT_HEADER = "-----BEGIN CERTIFICATE-----";
+const PEM_CERT_FOOTER = "-----END CERTIFICATE-----";
+
+function wrapCheckServerIdentityCallback(callback) {
+  return function(hostname, cert) {
+    // Parse cert from pem to a version that matches the tls.checkServerIdentity
+    // format.
+    // https://nodejs.org/api/tls.html#tls_tls_checkserveridentity_hostname_cert
+
+    var pemHeaderIndex = cert.indexOf(PEM_CERT_HEADER);
+    if (pemHeaderIndex === -1) {
+      return new Error("Unable to parse certificate PEM.");
+    }
+    cert = cert.substring(pemHeaderIndex);
+    var pemFooterIndex = cert.indexOf(PEM_CERT_FOOTER);
+    if (pemFooterIndex === -1) {
+      return new Error("Unable to parse certificate PEM.");
+    }
+    cert = cert.substring(PEM_CERT_HEADER.length, pemFooterIndex);
+    var rawBuffer = new Buffer(cert.replace("\n", "").replace(" ", ""), "base64");
+
+    return callback(hostname, { raw: rawBuffer });
+  }
+}
+
 /**
  * Create an SSL Credentials object. If using a client-side certificate, both
- * the second and third arguments must be passed.
+ * the second and third arguments must be passed. Additional peer verification
+ * options can be passed in the fourth argument as described below.
  * @memberof grpc.credentials
  * @alias grpc.credentials.createSsl
  * @kind function
@@ -86,9 +112,30 @@ var _ = require('lodash');
  * @param {Buffer=} private_key The client certificate private key, if
  *     applicable
  * @param {Buffer=} cert_chain The client certificate cert chain, if applicable
- * @return {grpc.credentials.ChannelCredentials} The SSL Credentials object
+ * @param {Function} verify_options.checkServerIdentity Optional callback
+ *     receiving the expected hostname and peer certificate for additional
+ *     verification. The callback should return an Error if verification
+ *     fails and otherwise return undefined.
+ * @return {grpc.credentials~ChannelCredentials} The SSL Credentials object
  */
-exports.createSsl = ChannelCredentials.createSsl;
+exports.createSsl = function(root_certs, private_key, cert_chain, verify_options) {
+  // The checkServerIdentity callback from gRPC core will receive the cert as a PEM.
+  // To better match the checkServerIdentity callback of Node, we wrap the callback
+  // to decode the PEM and populate a cert object.
+  if (verify_options && verify_options.checkServerIdentity) {
+    if (typeof verify_options.checkServerIdentity !== 'function') {
+      throw new TypeError("Value of checkServerIdentity must be a function.");
+    }
+    // Make a shallow clone of verify_options so our modification of the callback
+    // isn't reflected to the caller
+    var updated_verify_options = Object.assign({}, verify_options);
+    updated_verify_options.checkServerIdentity = wrapCheckServerIdentityCallback(
+        verify_options.checkServerIdentity);
+    arguments[3] = updated_verify_options;
+  }
+  return ChannelCredentials.createSsl.apply(this, arguments);
+}
+
 
 /**
  * @callback grpc.credentials~metadataCallback
@@ -113,7 +160,7 @@ exports.createSsl = ChannelCredentials.createSsl;
  * @alias grpc.credentials.createFromMetadataGenerator
  * @param {grpc.credentials~generateMetadata} metadata_generator The function
  *     that generates metadata
- * @return {grpc.credentials.CallCredentials} The credentials object
+ * @return {grpc.credentials~CallCredentials} The credentials object
  */
 exports.createFromMetadataGenerator = function(metadata_generator) {
   return CallCredentials.createFromPlugin(function(service_url, cb_data,
@@ -143,7 +190,7 @@ exports.createFromMetadataGenerator = function(metadata_generator) {
  * @alias grpc.credentials.createFromGoogleCredential
  * @param {external:GoogleCredential} google_credential The Google credential
  *     object to use
- * @return {grpc.credentials.CallCredentials} The resulting credentials object
+ * @return {grpc.credentials~CallCredentials} The resulting credentials object
  */
 exports.createFromGoogleCredential = function(google_credential) {
   return exports.createFromMetadataGenerator(function(auth_context, callback) {
@@ -166,10 +213,10 @@ exports.createFromGoogleCredential = function(google_credential) {
  * ChannelCredentials object.
  * @memberof grpc.credentials
  * @alias grpc.credentials.combineChannelCredentials
- * @param {ChannelCredentials} channel_credential The ChannelCredentials to
+ * @param {grpc.credentials~ChannelCredentials} channel_credential The ChannelCredentials to
  *     start with
- * @param {...CallCredentials} credentials The CallCredentials to compose
- * @return ChannelCredentials A credentials object that combines all of the
+ * @param {...grpc.credentials~CallCredentials} credentials The CallCredentials to compose
+ * @return {grpc.credentials~ChannelCredentials} A credentials object that combines all of the
  *     input credentials
  */
 exports.combineChannelCredentials = function(channel_credential) {
@@ -184,8 +231,8 @@ exports.combineChannelCredentials = function(channel_credential) {
  * Combine any number of CallCredentials into a single CallCredentials object
  * @memberof grpc.credentials
  * @alias grpc.credentials.combineCallCredentials
- * @param {...CallCredentials} credentials the CallCredentials to compose
- * @return CallCredentials A credentials object that combines all of the input
+ * @param {...grpc.credentials~CallCredentials} credentials The CallCredentials to compose
+ * @return {grpc.credentials~CallCredentials} A credentials object that combines all of the input
  *     credentials
  */
 exports.combineCallCredentials = function() {
@@ -202,6 +249,6 @@ exports.combineCallCredentials = function() {
  * @memberof grpc.credentials
  * @alias grpc.credentials.createInsecure
  * @kind function
- * @return {ChannelCredentials} The insecure credentials object
+ * @return {grpc.credentials~ChannelCredentials} The insecure credentials object
  */
 exports.createInsecure = ChannelCredentials.createInsecure;

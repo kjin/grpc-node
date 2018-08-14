@@ -1,9 +1,11 @@
 import * as http2 from 'http2';
 import {forOwn} from 'lodash';
 
-export type MetadataValue = string | Buffer;
+export type MetadataValue = string|Buffer;
 
-export interface MetadataObject { [key: string]: Array<MetadataValue>; }
+export interface MetadataObject {
+  [key: string]: MetadataValue[];
+}
 
 function cloneMetadataObject(repr: MetadataObject): MetadataObject {
   const result: MetadataObject = {};
@@ -26,7 +28,7 @@ function isLegalKey(key: string): boolean {
 }
 
 function isLegalNonBinaryValue(value: string): boolean {
-  return !!value.match(/^[ -~]+$/);
+  return !!value.match(/^[ -~]*$/);
 }
 
 function isBinaryKey(key: string): boolean {
@@ -113,7 +115,7 @@ export class Metadata {
    * @param key The key whose value should be retrieved.
    * @return A list of values associated with the given key.
    */
-  get(key: string): Array<MetadataValue> {
+  get(key: string): MetadataValue[] {
     key = normalizeKey(key);
     validate(key);
     if (Object.prototype.hasOwnProperty.call(this.internalRepr, key)) {
@@ -144,7 +146,7 @@ export class Metadata {
    * @return The newly cloned object.
    */
   clone(): Metadata {
-    let newMetadata = new Metadata();
+    const newMetadata = new Metadata();
     newMetadata.internalRepr = cloneMetadataObject(this.internalRepr);
     return newMetadata;
   }
@@ -166,6 +168,7 @@ export class Metadata {
    * Creates an OutgoingHttpHeaders object that can be used with the http2 API.
    */
   toHttp2Headers(): http2.OutgoingHttpHeaders {
+    // NOTE: Node <8.9 formats http2 headers incorrectly.
     const result: http2.OutgoingHttpHeaders = {};
     forOwn(this.internalRepr, (values, key) => {
       // We assume that the user's interaction with this object is limited to
@@ -181,6 +184,11 @@ export class Metadata {
     return result;
   }
 
+  // For compatibility with the other Metadata implementation
+  private _getCoreRepresentation() {
+    return this.internalRepr;
+  }
+
   /**
    * Returns a new Metadata object based fields in a given IncomingHttpHeaders
    * object.
@@ -194,16 +202,18 @@ export class Metadata {
           values.forEach((value) => {
             result.add(key, Buffer.from(value, 'base64'));
           });
-        } else {
-          result.add(key, Buffer.from(values, 'base64'));
+        } else if (values !== undefined) {
+          values.split(',')
+              .map(v => v.trim())
+              .forEach(v => result.add(key, Buffer.from(v, 'base64')));
         }
       } else {
         if (Array.isArray(values)) {
           values.forEach((value) => {
             result.add(key, value);
           });
-        } else {
-          result.add(key, values);
+        } else if (values !== undefined) {
+          values.split(',').map(v => v.trim()).forEach(v => result.add(key, v));
         }
       }
     });

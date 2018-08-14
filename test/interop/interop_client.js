@@ -20,12 +20,17 @@
 
 var fs = require('fs');
 var path = require('path');
-// TODO(murgatroid99): use multiple grpc implementations
-var grpc = require('grpc');
-var testProto = grpc.load({
-  root: __dirname + '/../../packages/grpc-native-core/deps/grpc',
-  file: 'src/proto/grpc/testing/test.proto'}).grpc.testing;
+var grpc = require('../any_grpc').client;
+var protoLoader = require('../../packages/grpc-protobufjs');
 var GoogleAuth = require('google-auth-library');
+
+var protoPackage = protoLoader.loadSync(
+    'src/proto/grpc/testing/test.proto',
+    {keepCase: true,
+     defaults: true,
+     enums: String,
+     includeDirs: [__dirname + '/../../packages/grpc-native-core/deps/grpc']});
+var testProto = grpc.loadPackageDefinition(protoPackage).grpc.testing;
 
 var assert = require('assert');
 
@@ -348,7 +353,7 @@ function statusCodeAndMessage(client, done) {
   client.unaryCall(arg, function(err, resp) {
     assert(err);
     assert.strictEqual(err.code, 2);
-    assert.strictEqual(err.message, 'test status message');
+    assert.strictEqual(err.details, 'test status message');
     done();
   });
   var duplex = client.fullDuplexCall();
@@ -362,6 +367,22 @@ function statusCodeAndMessage(client, done) {
   duplex.on('error', function(){});
   duplex.write(arg);
   duplex.end();
+}
+
+function specialStatusMessage(client, done) {
+  let expectedMessage = '\t\ntest with whitespace\r\nand Unicode BMP ☺ and non-BMP 😈\t\n';
+  let arg = {
+    response_status: {
+      code: 2,
+      message: expectedMessage
+    }
+  };
+  client.unaryCall(arg, function(err, resp) {
+    assert(err);
+    assert.strictEqual(err.code, 2);
+    assert.strictEqual(err.details, expectedMessage);
+    done();
+  });
 }
 
 // NOTE: the client param to this function is from UnimplementedService
@@ -525,6 +546,8 @@ var test_cases = {
                     Client: testProto.TestService},
   status_code_and_message: {run: statusCodeAndMessage,
                             Client: testProto.TestService},
+  special_status_message: {run: specialStatusMessage,
+                           Client: testProto.TestService},
   unimplemented_service: {run: unimplementedService,
                          Client: testProto.UnimplementedService},
   unimplemented_method: {run: unimplementedMethod,
@@ -611,8 +634,12 @@ if (require.main === module) {
   };
   runTest(argv.server_host + ':' + argv.server_port, argv.server_host_override,
           argv.test_case, argv.use_tls === 'true', argv.use_test_ca === 'true',
-          function () {
-            console.log('OK:', argv.test_case);
+          function (err) {
+            if (err) {
+              throw err;
+            } else {
+              console.log('OK:', argv.test_case);
+            }
           }, extra_args);
 }
 

@@ -8,7 +8,7 @@ import {ChannelCredentials} from '../src/channel-credentials';
 import {assert2, mockFunction} from './common';
 
 class CallCredentialsMock implements CallCredentials {
-  child: CallCredentialsMock;
+  child: CallCredentialsMock|null = null;
   constructor(child?: CallCredentialsMock) {
     if (child) {
       this.child = child;
@@ -32,6 +32,7 @@ class CallCredentialsMock implements CallCredentials {
   }
 }
 
+// tslint:disable-next-line:no-any
 const readFile: (...args: any[]) => Promise<Buffer> = promisify(fs.readFile);
 // A promise which resolves to loaded files in the form { ca, key, cert }
 const pFixtures = Promise
@@ -47,7 +48,7 @@ describe('ChannelCredentials Implementation', () => {
        () => {
          const creds = assert2.noThrowAndReturn(
              () => ChannelCredentials.createInsecure());
-         assert.ok(!creds.getSecureContext());
+         assert.ok(!creds.getConnectionOptions());
        });
   });
 
@@ -55,28 +56,28 @@ describe('ChannelCredentials Implementation', () => {
     it('should work when given no arguments', () => {
       const creds: ChannelCredentials =
           assert2.noThrowAndReturn(() => ChannelCredentials.createSsl());
-      assert.ok(!!creds.getSecureContext());
+      assert.ok(!!creds.getConnectionOptions());
     });
 
     it('should work with just a CA override', async () => {
       const {ca} = await pFixtures;
       const creds =
           assert2.noThrowAndReturn(() => ChannelCredentials.createSsl(ca));
-      assert.ok(!!creds.getSecureContext());
+      assert.ok(!!creds.getConnectionOptions());
     });
 
     it('should work with just a private key and cert chain', async () => {
       const {key, cert} = await pFixtures;
       const creds = assert2.noThrowAndReturn(
           () => ChannelCredentials.createSsl(null, key, cert));
-      assert.ok(!!creds.getSecureContext());
+      assert.ok(!!creds.getConnectionOptions());
     });
 
-    it('should work with all three parameters specified', async () => {
+    it('should work with three parameters specified', async () => {
       const {ca, key, cert} = await pFixtures;
       const creds = assert2.noThrowAndReturn(
           () => ChannelCredentials.createSsl(ca, key, cert));
-      assert.ok(!!creds.getSecureContext());
+      assert.ok(!!creds.getConnectionOptions());
     });
 
     it('should throw if just one of private key and cert chain are missing',

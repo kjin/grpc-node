@@ -58,7 +58,7 @@
       % for arg, prop in [('CPPFLAGS', 'cflags'), ('LDFLAGS', 'ldflags')]:
       %  if defaults['global'].get(arg, None) is not None:
       '${prop}': [
-        % for item in defaults['global'].get(arg).split():
+        % for item in defaults['global'].get(arg).split() + (['-fvisibility=hidden'] if arg == 'CPPFLAGS' else []):
           '${item}',
         % endfor
       ],
@@ -74,12 +74,16 @@
       ],
       'include_dirs': [
         'deps/grpc',
-        'deps/grpc/include'
+        'deps/grpc/include',
+        'deps/grpc/third_party/abseil-cpp',
+        'deps/grpc/third_party/nanopb'
       ],
       'defines': [
+        'PB_FIELD_32BIT',
         'GPR_BACKWARDS_COMPATIBILITY_MODE',
         'GRPC_ARES=0',
-        'GRPC_UV'
+        'GRPC_UV',
+        'GRPC_NODE_VERSION="${settings.get('node_version', settings.version)}"'
       ],
       'conditions': [
         ['grpc_gcov=="true"', {
@@ -167,12 +171,12 @@
           'xcode_settings': {
             % if defaults['global'].get('CPPFLAGS', None) is not None:
             'OTHER_CFLAGS': [
-              % for item in defaults['global'].get('CPPFLAGS').split():
+              % for item in defaults['global'].get('CPPFLAGS').split() + ['-fvisibility=hidden']:
                 '${item}',
               % endfor
             ],
             'OTHER_CPLUSPLUSFLAGS': [
-              % for item in defaults['global'].get('CPPFLAGS').split():
+              % for item in defaults['global'].get('CPPFLAGS').split() + ['-fvisibility=hidden']:
                 '${item}',
               % endfor
               '-stdlib=libc++',
@@ -187,13 +191,15 @@
     'conditions': [
       ['OS=="win" or runtime=="electron"', {
         'targets': [
-          % for module in node_modules:
           % for lib in libs:
-          % if lib.name in module.transitive_deps and lib.name == 'boringssl':
+          % if lib.name == 'boringssl':
           {
             'target_name': '${lib.name}',
             'product_prefix': 'lib',
             'type': 'static_library',
+            'cflags': [
+              '-Wno-implicit-fallthrough'
+            ],
             'dependencies': [
               % for dep in getattr(lib, 'deps', []):
               '${dep}',
@@ -213,7 +219,6 @@
             ]
           },
           % endif
-          % endfor
           % endfor
         ],
       }],
@@ -250,9 +255,8 @@
       ['OS == "win"', {
         'targets': [
           # Only want to compile zlib under Windows
-          % for module in node_modules:
           % for lib in libs:
-          % if lib.name in module.transitive_deps and lib.name == 'z':
+          % if lib.name == 'z':
           {
             'target_name': '${lib.name}',
             'product_prefix': 'lib',
@@ -270,14 +274,14 @@
           },
           % endif
           % endfor
-          % endfor
         ]
       }]
     ],
     'targets': [
-      % for module in node_modules:
+      % for core in libs:
+      % if core.name == 'grpc':
       % for lib in libs:
-      % if lib.name in module.transitive_deps and lib.name not in ('boringssl', 'z'):
+      % if lib.name == core.name or (lib.name in core.transitive_deps and lib.name not in ('boringssl', 'z')):
       {
         'target_name': '${lib.name}',
         'product_prefix': 'lib',
@@ -302,32 +306,25 @@
       },
       % endif
       % endfor
+      % endif
+      % endfor
       {
         'include_dirs': [
           "<!(node -e \"require('nan')\")"
         ],
         'cflags': [
           '-pthread',
-          '-zdefs',
           '-Wno-error=deprecated-declarations'
         ],
         "conditions": [
           ['OS=="win" or runtime=="electron"', {
             'dependencies': [
-              % for dep in getattr(module, 'deps', []):
-              % if dep == 'boringssl':
-              "${dep}",
-              % endif
-              % endfor
+              "boringssl",
             ]
           }],
           ['OS=="win"', {
             'dependencies': [
-              % for dep in getattr(module, 'deps', []):
-              % if dep == 'z':
-              "${dep}",
-              % endif
-              % endfor
+              "z",
             ]
           }],
           ['OS=="linux"', {
@@ -341,22 +338,15 @@
             }
           }]
         ],
-        "target_name": "${module.name}",
+        "target_name": "grpc_node",
         "sources": [
-          % for source in module.src:
-  ## temporary hack until we get the build.yaml out of grpc.
-          "${source[len('src/node/'):]}",
-          % endfor
+          "<!@(node -p \"require('fs').readdirSync('./ext').map(f=>'ext/'+f).join(' ')\")"
         ],
         "dependencies": [
-          % for dep in getattr(module, 'deps', []):
-          % if dep not in ('boringssl', 'z'):
-          "${dep}",
-          % endif
-          % endfor
+          "grpc",
+          "gpr",
         ]
       },
-      % endfor
       {
         "target_name": "action_after_build",
         "type": "none",
